@@ -99,10 +99,19 @@ macro_rules! make_config {
                     }
 
                     if arg.starts_with("-") {
-                        let feature = &arg["-".len()..];
+                        let (feature, enable) = if arg.ends_with("-") {
+                            (&arg["-".len()..arg.len() - 1], false)
+                        } else {
+                            (&arg["-".len()..], true)
+                        };
+
                         $(
                             if feature == stringify!($feature) {
-                                config.$feature.flags |= ENABLED;
+                                if enable {
+                                    config.$feature.flags |= ENABLED;
+                                } else {
+                                    config.$feature.flags &= !ENABLED;
+                                }
                                 continue;
                             }
                         )*
@@ -230,5 +239,32 @@ mod tests {
         Config::new_from_args(&vec!["-trace=a"]).expect_err("Can't trace disabled feature 'a'");
         Config::new_from_args(&vec!["-testtrace=a"]).expect_err("Can't testtrace disabled feature 'a'");
         Config::new_from_args(&vec!["-dump=a"]).expect_err("Can't dump disabled feature 'a'");
+    }
+
+    #[test]
+    fn disable_feature() {
+        make_config! {
+            Features {
+                a = true
+                b = false
+            }
+            TargetedFeatures {}
+        }
+
+        let cfg = Config::new();
+        assert_eq!(enabled!(cfg, a), true);
+        assert_eq!(enabled!(cfg, b), false);
+
+        let (cfg, _) = Config::new_from_args(&vec!["-b"]).unwrap();
+        assert_eq!(enabled!(cfg, a), true);
+        assert_eq!(enabled!(cfg, b), true);
+
+        let (cfg, _) = Config::new_from_args(&vec!["-a-"]).unwrap();
+        assert_eq!(enabled!(cfg, a), false);
+        assert_eq!(enabled!(cfg, b), false);
+
+        let (cfg, _) = Config::new_from_args(&vec!["-a-", "-b"]).unwrap();
+        assert_eq!(enabled!(cfg, a), false);
+        assert_eq!(enabled!(cfg, b), true);
     }
 }
