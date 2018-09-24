@@ -36,12 +36,17 @@ macro_rules! make_config {
             )*
         }
 
+        #[allow(dead_code)]
         static ENABLED: u8 =    0b0001;
+        #[allow(dead_code)]
         static TRACE: u8 =      0b0010;
+        #[allow(dead_code)]
         static TEST_TRACE: u8 = 0b0100;
+        #[allow(dead_code)]
         static DUMP: u8 =       0b1000;
 
         impl Config {
+            #[allow(dead_code)]
             fn new() -> Config {
                 Config {
                     $(
@@ -58,6 +63,7 @@ macro_rules! make_config {
                 }
             }
 
+            #[allow(dead_code)]
             fn new_from_args<T: AsRef<str>>(args: &[T]) -> Result<(Config, Vec<String>), String> {
                 let mut config = Config::new();
                 let mut remaining = Vec::new();
@@ -91,6 +97,13 @@ macro_rules! make_config {
                         $(
                             if dump == stringify!($feature) {
                                 config.$feature.flags |= DUMP;
+                                continue;
+                            }
+                        )*
+
+                        $(
+                            if dump == stringify!($targeted) {
+                                config.$targeted.flags |= DUMP;
                                 continue;
                             }
                         )*
@@ -139,7 +152,7 @@ macro_rules! make_config {
             };
             ($config:expr, $prop:ident, $target:expr) => {
                 if $config.$prop.flags & ENABLED == ENABLED {
-                    if let Some(targets) = $config.$props.targets {
+                    if let Some(targets) = $config.$prop.targets {
                         targets.contains($target)
                     }
 
@@ -186,6 +199,35 @@ macro_rules! make_config {
                     } else {
                         println!($msg);
                     }
+                }
+            };
+        }
+
+        #[allow(unused_macros)]
+        macro_rules! dump {
+            ($config:expr, $prop:ident, $obj:expr) => {
+                if $config.$prop.flags & DUMP == DUMP {
+                    println!("{:?}", $obj);
+                    true
+                } else {
+                    false
+                }
+            };
+            ($config:expr, $prop:ident, $target:expr, $obj:expr) => {
+                if $config.$prop.flags & DUMP == DUMP {
+                    if let Some(targets) = $config.$prop.targets {
+                        if targets.contains(&$target) {
+                            println!("{:?}", $obj);
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        println!("{:?}", $obj);
+                        true
+                    }
+                } else {
+                    false
                 }
             };
         }
@@ -268,5 +310,39 @@ mod tests {
         let (cfg, _) = Config::new_from_args(&vec!["-a-", "-b"]).unwrap();
         assert_eq!(enabled!(cfg, a), false);
         assert_eq!(enabled!(cfg, b), true);
+    }
+
+    #[test]
+    fn dump_obj() {
+        make_config! {
+            Features {
+                a = true
+            }
+            TargetedFeatures {
+                b = true
+            }
+        }
+
+        #[derive(Debug)]
+        struct Dumpable(i32);
+
+        let obj = Dumpable(7);
+        let target = "target".to_string();
+
+        let cfg = Config::new();
+        assert_eq!(dump!(cfg, a, obj), false);
+        assert_eq!(dump!(cfg, b, target, obj), false);
+
+        let (cfg, _) = Config::new_from_args(&vec!["-dump=a"]).unwrap();
+        assert_eq!(dump!(cfg, a, obj), true);
+        assert_eq!(dump!(cfg, b, target, obj), false);
+
+        let (cfg, _) = Config::new_from_args(&vec!["-dump=b"]).unwrap();
+        assert_eq!(dump!(cfg, a, obj), false);
+        assert_eq!(dump!(cfg, b, target, obj), true);
+
+        let (cfg, _) = Config::new_from_args(&vec!["-dump=a", "-dump=b"]).unwrap();
+        assert_eq!(dump!(cfg, a, obj), true);
+        assert_eq!(dump!(cfg, b, target, obj), true);
     }
 }
