@@ -132,6 +132,7 @@ macro_rules! make_config {
             }
         }
 
+        #[allow(unused_macros)]
         macro_rules! enabled {
             ($config:expr, $prop:ident) => {
                 $config.$prop.flags & ENABLED == ENABLED
@@ -149,6 +150,7 @@ macro_rules! make_config {
             };
         }
 
+        #[allow(unused_macros)]
         macro_rules! trace {
             ($config:expr, $prop:ident, $msg:expr) => {
                 if $config.$prop.flags & TRACE == TRACE {
@@ -168,6 +170,7 @@ macro_rules! make_config {
             };
         }
 
+        #[allow(unused_macros)]
         macro_rules! test_trace {
             ($config:expr, $prop:ident, $msg:expr) => {
                 if $config.$prop.flags & TEST_TRACE == TEST_TRACE {
@@ -191,7 +194,6 @@ macro_rules! make_config {
 
 #[cfg(test)]
 mod tests {
-
     #[test]
     fn basic() {
         make_config! {
