@@ -41,6 +41,33 @@ macro_rules! make_config {
         static TEST_TRACE:  u8 = 0b0100;
         static DUMP:        u8 = 0b1000;
 
+        macro_rules! parse_argument {
+            ($config:expr, $arg:expr, $flag_str:expr, $flag:ident) => {
+                {
+                    let flag_start = concat!("-", $flag_str, "=");
+                    if $arg.starts_with(flag_start) {
+                        let value = &$arg[flag_start.len()..];
+                        $(
+                            if value == stringify!($feature) {
+                                $config.$feature.flags |= $flag;
+                                continue;
+                            }
+                        )*
+
+                        $(
+                            if value == stringify!($targeted) {
+                                $config.$targeted.flags |= $flag;
+                                continue;
+                            }
+                        )*
+
+                        return Err(format!("Invalid value {} for {} argument", value, $flag_str));
+                    }
+                }
+
+            };
+        }
+
         impl Config {
             fn new() -> Config {
                 Config {
@@ -62,49 +89,11 @@ macro_rules! make_config {
                 let mut config = Config::new();
                 let mut remaining = Vec::new();
                 for arg in args.into_iter().map(|a| a.as_ref()) {
-                    if arg.starts_with("-trace=") {
-                        let trace = &arg["-trace=".len()..];
-                        $(
-                            if trace == stringify!($feature) {
-                                config.$feature.flags |= TRACE;
-                                continue;
-                            }
-                        )*
+                    parse_argument!(config, arg, "trace", TRACE);
+                    parse_argument!(config, arg, "testtrace", TEST_TRACE);
+                    parse_argument!(config, arg, "dump", DUMP);
 
-                        return Err(format!("Invalid trace argument: {}", trace));
-                    }
-
-                    if arg.starts_with("-testtrace=") {
-                        let test_trace = &arg["-testtrace=".len()..];
-                        $(
-                            if test_trace == stringify!($feature) {
-                                config.$feature.flags |= TEST_TRACE;
-                                continue;
-                            }
-                        )*
-
-                        return Err(format!("Invalid testtrace argument: {}", test_trace));
-                    }
-
-                    if arg.starts_with("-dump=") {
-                        let dump = &arg["-dump=".len()..];
-                        $(
-                            if dump == stringify!($feature) {
-                                config.$feature.flags |= DUMP;
-                                continue;
-                            }
-                        )*
-
-                        $(
-                            if dump == stringify!($targeted) {
-                                config.$targeted.flags |= DUMP;
-                                continue;
-                            }
-                        )*
-
-                        return Err(format!("Invalid dump argument: {}", dump));
-                    }
-
+                    // Feature flags (-FeatureA, -FeatureB-) are parsed differently than trace/testtrace/dump
                     if arg.starts_with("-") {
                         let (feature, enable) = if arg.ends_with("-") {
                             (&arg["-".len()..arg.len() - 1], false)
@@ -118,6 +107,17 @@ macro_rules! make_config {
                                     config.$feature.flags |= ENABLED;
                                 } else {
                                     config.$feature.flags &= !ENABLED;
+                                }
+                                continue;
+                            }
+                        )*
+
+                        $(
+                            if feature == stringify!($targeted) {
+                                if enable {
+                                    config.$targeted.flags |= ENABLED;
+                                } else {
+                                    config.$targeted.flags &= !ENABLED;
                                 }
                                 continue;
                             }
@@ -277,34 +277,41 @@ mod tests {
     }
 
     #[test]
-    fn disable_feature() {
+    fn feature() {
         make_config! {
             Features {
                 a = true
                 b = false
             }
-            TargetedFeatures {}
+            TargetedFeatures {
+                c = true
+                d = false
+            }
         }
 
         let cfg = Config::new();
         assert_eq!(enabled!(cfg, a), true);
         assert_eq!(enabled!(cfg, b), false);
+        assert_eq!(enabled!(cfg, c), true);
+        assert_eq!(enabled!(cfg, d), false);
 
-        let (cfg, _) = Config::new_from_args(&vec!["-b"]).unwrap();
-        assert_eq!(enabled!(cfg, a), true);
-        assert_eq!(enabled!(cfg, b), true);
+        fn test_args(args: &[&str], expected: &[bool]) {
+            let cfg = Config::new_from_args(args).unwrap().0;
+            assert_eq!(enabled!(cfg, a), expected[0]);
+            assert_eq!(enabled!(cfg, b), expected[1]);
+            assert_eq!(enabled!(cfg, c), expected[2]);
+            assert_eq!(enabled!(cfg, d), expected[3]);
+        }
 
-        let (cfg, _) = Config::new_from_args(&vec!["-a-"]).unwrap();
-        assert_eq!(enabled!(cfg, a), false);
-        assert_eq!(enabled!(cfg, b), false);
-
-        let (cfg, _) = Config::new_from_args(&vec!["-a-", "-b"]).unwrap();
-        assert_eq!(enabled!(cfg, a), false);
-        assert_eq!(enabled!(cfg, b), true);
+        test_args(&["-b"], &[true, true, true, false]);
+        test_args(&["-d"], &[true, false, true, true]);
+        test_args(&["-a-"], &[false, false, true, false]);
+        test_args(&["-a-", "-b"], &[false, true, true, false]);
+        test_args(&["-c-", "-a-", "-d"], &[false, false, false, true]);
     }
 
     #[test]
-    fn dump_obj() {
+    fn dump() {
         make_config! {
             Features {
                 a = true
