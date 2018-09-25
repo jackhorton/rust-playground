@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_macros)]
+
 #[macro_export]
 macro_rules! make_config {
     (
@@ -12,20 +15,17 @@ macro_rules! make_config {
             )*
         }
     ) => {
-        #[allow(dead_code)]
         #[derive(Debug)]
         struct FeatureConfig {
             flags: u8,
         }
 
-        #[allow(dead_code)]
         #[derive(Debug)]
         struct TargetedFeatureConfig {
             flags: u8,
             targets: Option<Vec<String>>
         }
 
-        #[allow(dead_code)]
         #[derive(Debug)]
         struct Config {
             $(
@@ -36,17 +36,12 @@ macro_rules! make_config {
             )*
         }
 
-        #[allow(dead_code)]
-        static ENABLED: u8 =    0b0001;
-        #[allow(dead_code)]
-        static TRACE: u8 =      0b0010;
-        #[allow(dead_code)]
-        static TEST_TRACE: u8 = 0b0100;
-        #[allow(dead_code)]
-        static DUMP: u8 =       0b1000;
+        static ENABLED:     u8 = 0b0001;
+        static TRACE:       u8 = 0b0010;
+        static TEST_TRACE:  u8 = 0b0100;
+        static DUMP:        u8 = 0b1000;
 
         impl Config {
-            #[allow(dead_code)]
             fn new() -> Config {
                 Config {
                     $(
@@ -63,7 +58,6 @@ macro_rules! make_config {
                 }
             }
 
-            #[allow(dead_code)]
             fn new_from_args<T: AsRef<str>>(args: &[T]) -> Result<(Config, Vec<String>), String> {
                 let mut config = Config::new();
                 let mut remaining = Vec::new();
@@ -163,7 +157,6 @@ macro_rules! make_config {
             };
         }
 
-        #[allow(unused_macros)]
         macro_rules! trace {
             ($config:expr, $prop:ident, $msg:expr) => {
                 if $config.$prop.flags & TRACE == TRACE {
@@ -183,7 +176,6 @@ macro_rules! make_config {
             };
         }
 
-        #[allow(unused_macros)]
         macro_rules! test_trace {
             ($config:expr, $prop:ident, $msg:expr) => {
                 if $config.$prop.flags & TEST_TRACE == TEST_TRACE {
@@ -203,7 +195,6 @@ macro_rules! make_config {
             };
         }
 
-        #[allow(unused_macros)]
         macro_rules! dump {
             ($config:expr, $prop:ident, $obj:expr) => {
                 if $config.$prop.flags & DUMP == DUMP {
